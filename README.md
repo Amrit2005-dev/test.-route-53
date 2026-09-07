@@ -6,11 +6,12 @@ A high-fidelity, production-ready recreation of the **AWS Route 53 Management Co
 
 ## 🔗 Live Demo & Deployment
 
-- **Hosted Demo URL**: [https://route53-clone.vercel.app](https://route53-clone.vercel.app) *(or your deployed Vercel URL)*
+- **Hosted Backend API**: [https://test-route-53.onrender.com](https://test-route-53.onrender.com)
+- **Live Swagger API Docs**: [https://test-route-53.onrender.com/docs](https://test-route-53.onrender.com/docs)
+- **Hosted Frontend (Vercel)**: `https://<your-vercel-app-name>.vercel.app`
 - **Demo Credentials**:
   - **Username**: `admin`
   - **Password**: `admin123`
-- **Backend API Swagger Docs**: `https://<your-backend-api-url>/docs` (or `http://127.0.0.1:8000/docs` locally)
 
 ---
 
