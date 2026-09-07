@@ -264,88 +264,23 @@ docker-compose up --build
 
 ---
 
-## ☁️ Deployment Guide
 
-### Deploying Frontend to Vercel
 
-1. Push your repository to **GitHub / GitLab / Bitbucket**.
-2. Go to [Vercel Dashboard](https://vercel.com) ➔ **Add New Project** ➔ Import this repository.
-3. Configure the project settings:
-   - **Framework Preset**: `Next.js`
-   - **Root Directory**: `frontend` *(or leave root if using `vercel.json`)*
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `.next`
+
 4. **Environment Variables**:
    Add the following environment variable in Vercel:
    | Variable Name | Example Value | Description |
    | :--- | :--- | :--- |
    | `API_URL` | `https://your-backend-service.onrender.com` | Backend API URL for server-side rewrites |
    | `NEXT_PUBLIC_API_URL` | `https://your-backend-service.onrender.com` | Backend API URL for client-side API calls |
-5. Click **Deploy**.
 
----
 
-### Deploying Backend to Cloud (Render / Railway / Fly.io / AWS)
 
-#### On Render:
-1. Create a **Web Service** on [Render](https://render.com).
-2. Connect your Git repository.
-3. Set:
-   - **Root Directory**: `backend`
-   - **Environment**: `Python 3`
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+
+
 4. Add Environment Variables:
    - `ALLOWED_ORIGINS`: `https://your-app.vercel.app,http://localhost:3000`
    - `DATABASE_URL`: `sqlite:///./route53.db` *(or your PostgreSQL connection string)*
    - `ENV`: `production`
 
----
-
-## 📤 Pushing to Git
-
-To push your codebase to your remote GitHub repository:
-
-```bash
-# Initialize git if not already done:
-git init
-
-# Stage all files:
-git add .
-
-# Create initial commit:
-git commit -m "feat: complete AWS Route 53 console clone with full DNS record types & Cloudscape UI"
-
-# Link your remote repository:
-git branch -M main
-git remote add origin https://github.com/Amrit2005-dev/test.-route-53.git
-
-# Push to main:
-git push -u origin main
-```
-
----
-
-## 🧪 Testing & Verification
-
-### Backend Automated Test Suite
-Run the 21 comprehensive test suites validating DNS record types, zone CRUD, auth, and health checks:
-```bash
-cd backend
-pytest tests/ -v
-```
-**Result**: `21 passed in 2.98s (100% pass rate)`
-
-### Frontend Production Build Test
-Verify Next.js compilation, type validity, and page bundle generation:
-```bash
-cd frontend
-npm run build
-```
-**Result**: `✓ Compiled successfully with 0 errors`
-
----
-
-## 🛡️ License
-
-This project is licensed under the **MIT License**.
