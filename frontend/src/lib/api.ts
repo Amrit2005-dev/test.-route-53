@@ -58,13 +58,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({ detail: null }));
-    const detail = data.detail;
-    let message =
-      typeof detail === "string"
-        ? detail
-        : Array.isArray(detail)
-          ? detail[0]?.msg
-          : null;
+    const detail = data?.detail;
+    let message: string | null = null;
+    if (typeof detail === "string") {
+      message = detail;
+    } else if (Array.isArray(detail) && detail.length > 0) {
+      const first = detail[0];
+      const field = Array.isArray(first?.loc) ? first.loc.slice(1).join(" -> ") : "";
+      const rawMsg = first?.msg || "Validation error";
+      message = field ? `${field}: ${rawMsg}` : rawMsg;
+    }
     if (!message && response.status >= 500) {
       message = "Cannot reach the API. Start the backend with: cd backend && python run.py";
     }

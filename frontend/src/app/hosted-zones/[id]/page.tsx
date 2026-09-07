@@ -111,6 +111,7 @@ export default function HostedZoneDetailPage() {
   const [editRecord, setEditRecord] = useState<DNSRecord | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; value?: string; ttl?: string; weight?: string; failover?: string }>({});
   const [form, setForm] = useState({
     name: "",
     type: "A" as RecordType,
@@ -168,12 +169,13 @@ export default function HostedZoneDetailPage() {
   }, [fetchRecords, auth.loading, auth.user, zoneError, zone]);
 
   useEffect(() => {
-    const handler = () => setCreateOpen(true);
+    const handler = () => { setErrors({}); setCreateOpen(true); };
     window.addEventListener("route53:create", handler);
     return () => window.removeEventListener("route53:create", handler);
   }, []);
 
   useEffect(() => {
+    setErrors({});
     if (editRecord) {
       const rel = editRecord.name === zone?.name ? "@" : editRecord.name.replace(`.${zone?.name}`, "").replace(zone?.name || "", "");
       setForm({
@@ -220,13 +222,35 @@ export default function HostedZoneDetailPage() {
   };
 
   const handleSaveRecord = async () => {
+    const fieldErrors: { name?: string; value?: string; ttl?: string; weight?: string; failover?: string } = {};
+
+    if (!form.value || !form.value.trim()) {
+      fieldErrors.value = "Value is required. Please enter an IP address, domain, or record content.";
+    }
+    if (!form.alias_target && (!form.ttl || isNaN(Number(form.ttl)) || Number(form.ttl) < 0)) {
+      fieldErrors.ttl = "TTL must be a valid positive integer.";
+    }
+    if (form.routing_policy === "Weighted" && (form.weight === "" || isNaN(Number(form.weight)) || Number(form.weight) < 0 || Number(form.weight) > 255)) {
+      fieldErrors.weight = "Weight must be an integer between 0 and 255.";
+    }
+    if (form.routing_policy === "Failover" && !form.failover) {
+      fieldErrors.failover = "Failover type is required (Primary or Secondary).";
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(fieldErrors);
+      notify("error", "Validation error", fieldErrors.value || Object.values(fieldErrors)[0]);
+      return;
+    }
+
+    setErrors({});
     setSubmitting(true);
     try {
       const payload = {
         name: form.name || "@",
         type: form.type,
         ttl: Number(form.ttl),
-        value: form.value,
+        value: form.value.trim(),
         routing_policy: form.routing_policy,
         weight: form.routing_policy === "Weighted" && form.weight ? Number(form.weight) : null,
         failover: form.routing_policy === "Failover" ? form.failover || null : null,
@@ -357,8 +381,16 @@ export default function HostedZoneDetailPage() {
                 options={RECORD_TYPE_OPTIONS}
               />
             </FormField>
-            <FormField label="TTL (seconds)">
-              <Input type="number" value={form.ttl} onChange={({ detail }) => setForm({ ...form, ttl: detail.value })} disabled={form.alias_target} />
+            <FormField label="TTL (seconds)" errorText={errors.ttl}>
+              <Input
+                type="number"
+                value={form.ttl}
+                onChange={({ detail }) => {
+                  setForm({ ...form, ttl: detail.value });
+                  if (errors.ttl) setErrors((prev) => ({ ...prev, ttl: undefined }));
+                }}
+                disabled={form.alias_target}
+              />
             </FormField>
           </ColumnLayout>
           <FormField label="Routing policy">
@@ -369,13 +401,26 @@ export default function HostedZoneDetailPage() {
             />
           </FormField>
           {form.routing_policy === "Weighted" && (
-            <FormField label="Weight"><Input type="number" value={form.weight} onChange={({ detail }) => setForm({ ...form, weight: detail.value })} /></FormField>
+            <FormField label="Weight" errorText={errors.weight}>
+              <Input
+                type="number"
+                value={form.weight}
+                onChange={({ detail }) => {
+                  setForm({ ...form, weight: detail.value });
+                  if (errors.weight) setErrors((prev) => ({ ...prev, weight: undefined }));
+                }}
+                placeholder="0 - 255"
+              />
+            </FormField>
           )}
           {form.routing_policy === "Failover" && (
-            <FormField label="Failover type">
+            <FormField label="Failover type" errorText={errors.failover}>
               <Select
                 selectedOption={{ label: form.failover || "Primary", value: form.failover || "PRIMARY" }}
-                onChange={({ detail }) => setForm({ ...form, failover: detail.selectedOption.value || "" })}
+                onChange={({ detail }) => {
+                  setForm({ ...form, failover: detail.selectedOption.value || "" });
+                  if (errors.failover) setErrors((prev) => ({ ...prev, failover: undefined }));
+                }}
                 options={[{ label: "Primary", value: "PRIMARY" }, { label: "Secondary", value: "SECONDARY" }]}
               />
             </FormField>
@@ -385,6 +430,7 @@ export default function HostedZoneDetailPage() {
           </Checkbox>
           <FormField
             label="Value / Route traffic to"
+            errorText={errors.value}
             description={
               form.alias_target
                 ? "Choose an alias target (e.g. AWS resource domain or Route 53 record name)."
@@ -393,7 +439,10 @@ export default function HostedZoneDetailPage() {
           >
             <Textarea
               value={form.value}
-              onChange={({ detail }) => setForm({ ...form, value: detail.value })}
+              onChange={({ detail }) => {
+                setForm({ ...form, value: detail.value });
+                if (errors.value) setErrors((prev) => ({ ...prev, value: undefined }));
+              }}
               rows={4}
               placeholder={
                 form.alias_target
