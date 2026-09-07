@@ -316,9 +316,9 @@ git add .
 # Create initial commit:
 git commit -m "feat: complete AWS Route 53 console clone with full DNS record types & Cloudscape UI"
 
-# Link your remote repository (replace with your GitHub URL):
+# Link your remote repository:
 git branch -M main
-git remote add origin https://github.com/<your-username>/route53-clone.git
+git remote add origin https://github.com/Amrit2005-dev/test.-route-53.git
 
 # Push to main:
 git push -u origin main
