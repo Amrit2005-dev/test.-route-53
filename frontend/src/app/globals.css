@@ -1,0 +1,125 @@
+/* Cloudscape provides base styles — avoid Tailwind preflight conflicts */
+
+* {
+  box-sizing: border-box;
+}
+
+:root,
+[data-theme="light"] {
+  --aws-bg: #f2f3f3;
+  --aws-surface: #ffffff;
+  --aws-surface-alt: #fafafa;
+  --aws-border: #d5dbdb;
+  --aws-text: #16191f;
+  --aws-text-secondary: #545b64;
+  --aws-link: #0073bb;
+  --aws-orange: #ff9900;
+  --aws-success: #1d8102;
+  --aws-error: #d13212;
+}
+
+[data-theme="dark"] {
+  --aws-bg: #0f1419;
+  --aws-surface: #16191f;
+  --aws-surface-alt: #232f3e;
+  --aws-border: #414d5c;
+  --aws-text: #eaeded;
+  --aws-text-secondary: #aab7b8;
+  --aws-link: #42b4ff;
+  --aws-orange: #ff9900;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+awsui-app-layout:not([class*="awsui_root"]) {
+  min-height: calc(100vh - 56px);
+}
+
+#aws-top-nav img,
+#aws-top-nav [class*="logo"] img,
+#aws-top-nav [class*="identity"] img {
+  height: 20px !important;
+  max-height: 20px !important;
+  width: auto !important;
+  max-width: 36px !important;
+  object-fit: contain !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+#aws-top-nav svg,
+#aws-top-nav [class*="icon"] svg,
+#aws-top-nav button svg {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+}
+
+
+
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .aws-btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded px-4 py-1.5 text-sm font-medium text-white transition-colors;
+    background: #ff9900;
+    border: 1px solid #d45b07;
+  }
+
+  .aws-btn-primary:hover:not(:disabled) {
+    background: #ec7211;
+  }
+
+  .aws-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .aws-btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded border px-4 py-1.5 text-sm font-medium transition-colors;
+    background: #fff;
+    border-color: #d5dbdb;
+    color: #16191f;
+  }
+
+  .aws-btn-link {
+    color: #0073bb;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+
+  .aws-card {
+    @apply rounded border bg-white;
+    border-color: #d5dbdb;
+  }
+
+  .aws-input {
+    @apply w-full rounded border px-3 py-1.5 text-sm outline-none;
+    border-color: #d5dbdb;
+    background: #fff;
+    color: #16191f;
+  }
+
+  .aws-page-title {
+    @apply text-2xl font-normal;
+    color: var(--aws-text);
+  }
+}

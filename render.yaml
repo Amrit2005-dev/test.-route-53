@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: route53-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: gunicorn app.main:app -c gunicorn.conf.py
+    healthCheckPath: /api/health/ready
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: ENV
+        value: production
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: DATABASE_URL
+        value: sqlite:///route53.db
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: WEB_CONCURRENCY
+        value: "2"
+
+  - type: web
+    name: route53-web
+    runtime: node
+    rootDir: frontend
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: API_URL
+        sync: false
