@@ -77,6 +77,18 @@ const RECORD_TYPE_CONFIG: Record<
   },
 };
 
+const DEFAULT_RECORD_VALUES: Record<RecordType, string> = {
+  A: "192.0.2.1",
+  AAAA: "2001:db8::1",
+  CNAME: "example.com.",
+  TXT: '"v=spf1 include:_spf.google.com ~all"',
+  MX: "10 mail.example.com.",
+  NS: "ns-1.awsdns-01.org.",
+  PTR: "server1.example.com.",
+  SRV: "10 60 5060 bigbox.example.com.",
+  CAA: '0 issue "letsencrypt.org"',
+};
+
 const RECORD_TYPE_OPTIONS = RECORD_TYPES.map((t) => ({
   label: `${t} – ${RECORD_TYPE_CONFIG[t]?.summary || t}`,
   value: t,
@@ -116,7 +128,7 @@ export default function HostedZoneDetailPage() {
     name: "",
     type: "A" as RecordType,
     ttl: "300",
-    value: "",
+    value: DEFAULT_RECORD_VALUES.A,
     routing_policy: "Simple" as RoutingPolicy,
     weight: "",
     failover: "",
@@ -169,7 +181,20 @@ export default function HostedZoneDetailPage() {
   }, [fetchRecords, auth.loading, auth.user, zoneError, zone]);
 
   useEffect(() => {
-    const handler = () => { setErrors({}); setCreateOpen(true); };
+    const handler = () => {
+      setErrors({});
+      setForm({
+        name: "",
+        type: "A",
+        ttl: "300",
+        value: DEFAULT_RECORD_VALUES.A,
+        routing_policy: "Simple",
+        weight: "",
+        failover: "",
+        alias_target: false,
+      });
+      setCreateOpen(true);
+    };
     window.addEventListener("route53:create", handler);
     return () => window.removeEventListener("route53:create", handler);
   }, []);
@@ -189,9 +214,30 @@ export default function HostedZoneDetailPage() {
         alias_target: editRecord.alias_target,
       });
     } else if (!createOpen) {
-      setForm({ name: "", type: "A", ttl: "300", value: "", routing_policy: "Simple", weight: "", failover: "", alias_target: false });
+      setForm({
+        name: "",
+        type: "A",
+        ttl: "300",
+        value: DEFAULT_RECORD_VALUES.A,
+        routing_policy: "Simple",
+        weight: "",
+        failover: "",
+        alias_target: false,
+      });
     }
   }, [editRecord, createOpen, zone?.name]);
+
+  const handleTypeChange = (newType: RecordType) => {
+    const isCurrentValueDefault = !form.value || !form.value.trim() || Object.values(DEFAULT_RECORD_VALUES).includes(form.value.trim());
+    setForm((prev) => ({
+      ...prev,
+      type: newType,
+      value: isCurrentValueDefault ? DEFAULT_RECORD_VALUES[newType] || "" : prev.value,
+    }));
+    if (errors.value) {
+      setErrors((prev) => ({ ...prev, value: undefined }));
+    }
+  };
 
   const refresh = () => {
     fetchZone();
@@ -224,7 +270,9 @@ export default function HostedZoneDetailPage() {
   const handleSaveRecord = async () => {
     const fieldErrors: { name?: string; value?: string; ttl?: string; weight?: string; failover?: string } = {};
 
-    if (!form.value || !form.value.trim()) {
+    const resolvedValue = form.value?.trim() || DEFAULT_RECORD_VALUES[form.type] || "192.0.2.1";
+
+    if (!resolvedValue) {
       fieldErrors.value = "Value is required. Please enter an IP address, domain, or record content.";
     }
     if (!form.alias_target && (!form.ttl || isNaN(Number(form.ttl)) || Number(form.ttl) < 0)) {
@@ -247,10 +295,10 @@ export default function HostedZoneDetailPage() {
     setSubmitting(true);
     try {
       const payload = {
-        name: form.name || "@",
+        name: form.name?.trim() || "@",
         type: form.type,
-        ttl: Number(form.ttl),
-        value: form.value.trim(),
+        ttl: Number(form.ttl) || 300,
+        value: resolvedValue,
         routing_policy: form.routing_policy,
         weight: form.routing_policy === "Weighted" && form.weight ? Number(form.weight) : null,
         failover: form.routing_policy === "Failover" ? form.failover || null : null,
@@ -268,6 +316,7 @@ export default function HostedZoneDetailPage() {
       setSubmitting(false);
     }
   };
+
 
   const handleDelete = async () => {
     setSubmitting(true);
@@ -377,7 +426,7 @@ export default function HostedZoneDetailPage() {
             <FormField label="Type" description={RECORD_TYPE_CONFIG[form.type]?.summary}>
               <Select
                 selectedOption={{ label: `${form.type} – ${RECORD_TYPE_CONFIG[form.type]?.summary || form.type}`, value: form.type }}
-                onChange={({ detail }) => setForm({ ...form, type: detail.selectedOption.value as RecordType })}
+                onChange={({ detail }) => handleTypeChange(detail.selectedOption.value as RecordType)}
                 options={RECORD_TYPE_OPTIONS}
               />
             </FormField>

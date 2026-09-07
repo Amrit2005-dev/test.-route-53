@@ -26,20 +26,31 @@ import type { DNSRecord, HostedZone } from "@/lib/types";
 function ZoneFormFields({
   values,
   onChange,
+  errors,
+  setErrors,
 }: {
   values: { name: string; description: string; comment: string; type: "Public" | "Private"; private_vpc: string };
   onChange: (v: typeof values) => void;
+  errors?: { name?: string; private_vpc?: string };
+  setErrors?: (fn: (prev: { name?: string; private_vpc?: string }) => { name?: string; private_vpc?: string }) => void;
 }) {
   return (
     <SpaceBetween size="m">
-      <FormField label="Domain name">
-        <Input value={values.name} onChange={({ detail }) => onChange({ ...values, name: detail.value })} placeholder="example.com" />
+      <FormField label="Domain name" errorText={errors?.name} description="Specify a fully qualified domain name (e.g. example.com or app.internal).">
+        <Input
+          value={values.name}
+          onChange={({ detail }) => {
+            onChange({ ...values, name: detail.value });
+            if (errors?.name && setErrors) setErrors((p) => ({ ...p, name: undefined }));
+          }}
+          placeholder="example.com"
+        />
       </FormField>
       <FormField label="Description">
-        <Input value={values.description} onChange={({ detail }) => onChange({ ...values, description: detail.value })} />
+        <Input value={values.description} onChange={({ detail }) => onChange({ ...values, description: detail.value })} placeholder="Production public hosted zone" />
       </FormField>
       <FormField label="Comment">
-        <Textarea value={values.comment} onChange={({ detail }) => onChange({ ...values, comment: detail.value })} rows={3} />
+        <Textarea value={values.comment} onChange={({ detail }) => onChange({ ...values, comment: detail.value })} rows={3} placeholder="Optional notes for your team" />
       </FormField>
       <FormField label="Type">
         <Select
@@ -52,8 +63,15 @@ function ZoneFormFields({
         />
       </FormField>
       {values.type === "Private" && (
-        <FormField label="VPC ID">
-          <Input value={values.private_vpc} onChange={({ detail }) => onChange({ ...values, private_vpc: detail.value })} placeholder="vpc-xxxxxxxx" />
+        <FormField label="VPC ID" errorText={errors?.private_vpc} description="VPC associated with this private zone.">
+          <Input
+            value={values.private_vpc}
+            onChange={({ detail }) => {
+              onChange({ ...values, private_vpc: detail.value });
+              if (errors?.private_vpc && setErrors) setErrors((p) => ({ ...p, private_vpc: undefined }));
+            }}
+            placeholder="vpc-0a1b2c3d4e5f67890"
+          />
         </FormField>
       )}
     </SpaceBetween>
@@ -80,6 +98,7 @@ export default function HostedZonesPage() {
   const [delegationZone, setDelegationZone] = useState<HostedZone | null>(null);
   const [delegationNs, setDelegationNs] = useState<DNSRecord[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; private_vpc?: string }>({});
   const [form, setForm] = useState({ name: "", description: "", comment: "", type: "Public" as "Public" | "Private", private_vpc: "" });
 
   const fetchZones = useCallback(async () => {
@@ -110,12 +129,17 @@ export default function HostedZonesPage() {
   }, [fetchZones, auth.loading, auth.user]);
 
   useEffect(() => {
-    const handler = () => setCreateOpen(true);
+    const handler = () => {
+      setErrors({});
+      setForm({ name: "", description: "", comment: "", type: "Public", private_vpc: "" });
+      setCreateOpen(true);
+    };
     window.addEventListener("route53:create", handler);
     return () => window.removeEventListener("route53:create", handler);
   }, []);
 
   useEffect(() => {
+    setErrors({});
     if (editZone) {
       setForm({
         name: editZone.name.replace(/\.$/, ""),
@@ -141,9 +165,30 @@ export default function HostedZonesPage() {
   };
 
   const handleCreate = async () => {
+    const validationErrors: { name?: string; private_vpc?: string } = {};
+    const domainName = form.name.trim();
+
+    if (!domainName) {
+      validationErrors.name = "Domain name is required (e.g. example.com)";
+    }
+    if (form.type === "Private" && !form.private_vpc.trim()) {
+      validationErrors.private_vpc = "VPC ID is required for private hosted zones (e.g. vpc-0a1b2c3d4e5f67890)";
+    }
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      notify("error", "Validation error", validationErrors.name || validationErrors.private_vpc);
+      return;
+    }
+
+    setErrors({});
     setSubmitting(true);
     try {
-      const zone = await api.createHostedZone(form);
+      const zone = await api.createHostedZone({
+        ...form,
+        name: domainName,
+        private_vpc: form.type === "Private" ? form.private_vpc.trim() : undefined,
+      });
       notify("success", "Hosted zone created");
       setCreateOpen(false);
       fetchZones();
@@ -157,9 +202,30 @@ export default function HostedZonesPage() {
 
   const handleEdit = async () => {
     if (!editZone) return;
+    const validationErrors: { name?: string; private_vpc?: string } = {};
+    const domainName = form.name.trim();
+
+    if (!domainName) {
+      validationErrors.name = "Domain name is required (e.g. example.com)";
+    }
+    if (form.type === "Private" && !form.private_vpc.trim()) {
+      validationErrors.private_vpc = "VPC ID is required for private hosted zones";
+    }
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      notify("error", "Validation error", validationErrors.name || validationErrors.private_vpc);
+      return;
+    }
+
+    setErrors({});
     setSubmitting(true);
     try {
-      await api.updateHostedZone(editZone.id, form);
+      await api.updateHostedZone(editZone.id, {
+        ...form,
+        name: domainName,
+        private_vpc: form.type === "Private" ? form.private_vpc.trim() : undefined,
+      });
       notify("success", "Hosted zone updated");
       setEditZone(null);
       fetchZones();
@@ -305,7 +371,7 @@ export default function HostedZonesPage() {
           <Button variant="primary" loading={submitting} onClick={handleCreate}>Create</Button>
         </SpaceBetween></Box>
       }>
-        <ZoneFormFields values={form} onChange={setForm} />
+        <ZoneFormFields values={form} onChange={setForm} errors={errors} setErrors={setErrors} />
       </Modal>
 
       <Modal visible={!!editZone} onDismiss={() => setEditZone(null)} header="Edit hosted zone" footer={
@@ -314,7 +380,7 @@ export default function HostedZonesPage() {
           <Button variant="primary" loading={submitting} onClick={handleEdit}>Save</Button>
         </SpaceBetween></Box>
       }>
-        <ZoneFormFields values={form} onChange={setForm} />
+        <ZoneFormFields values={form} onChange={setForm} errors={errors} setErrors={setErrors} />
       </Modal>
 
       <Modal visible={deleteOpen} onDismiss={() => setDeleteOpen(false)} header="Delete hosted zones" footer={

@@ -63,19 +63,33 @@ export default function HealthChecksPage() {
     return () => clearTimeout(t);
   }, [fetchChecks, auth.loading, auth.user]);
 
+  const [errors, setErrors] = useState<{ name?: string; endpoint?: string }>({});
+
   const handleCreate = async () => {
+    const valErrors: { name?: string; endpoint?: string } = {};
+    if (!form.name.trim()) valErrors.name = "Health check name is required";
+    if (!form.endpoint.trim()) valErrors.endpoint = "Endpoint is required (e.g. example.com)";
+
+    if (Object.keys(valErrors).length > 0) {
+      setErrors(valErrors);
+      notify("error", "Validation error", valErrors.name || valErrors.endpoint);
+      return;
+    }
+
+    setErrors({});
     setSubmitting(true);
     try {
       await api.createHealthCheck({
-        name: form.name,
-        endpoint: form.endpoint,
+        name: form.name.trim(),
+        endpoint: form.endpoint.trim(),
         protocol: form.protocol,
-        port: Number(form.port),
-        path: form.path,
-        interval_seconds: Number(form.interval_seconds),
+        port: Number(form.port) || 443,
+        path: form.path || "/",
+        interval_seconds: Number(form.interval_seconds) || 30,
       });
       notify("success", "Health check created");
       setCreateOpen(false);
+      setForm({ name: "", endpoint: "", protocol: "HTTPS", port: "443", path: "/", interval_seconds: "30" });
       fetchChecks();
     } catch (err) {
       notify("error", "Create failed", err instanceof ApiError ? err.message : undefined);
@@ -159,8 +173,26 @@ export default function HealthChecksPage() {
         }
       >
         <SpaceBetween size="m">
-          <FormField label="Name"><Input value={form.name} onChange={({ detail }) => setForm({ ...form, name: detail.value })} /></FormField>
-          <FormField label="Endpoint"><Input value={form.endpoint} onChange={({ detail }) => setForm({ ...form, endpoint: detail.value })} placeholder="example.com" /></FormField>
+          <FormField label="Name" errorText={errors.name} description="Friendly name for this health check">
+            <Input
+              value={form.name}
+              onChange={({ detail }) => {
+                setForm({ ...form, name: detail.value });
+                if (errors.name) setErrors((p) => ({ ...p, name: undefined }));
+              }}
+              placeholder="e.g. Primary Web Server"
+            />
+          </FormField>
+          <FormField label="Endpoint" errorText={errors.endpoint} description="Domain name or IPv4 address to monitor">
+            <Input
+              value={form.endpoint}
+              onChange={({ detail }) => {
+                setForm({ ...form, endpoint: detail.value });
+                if (errors.endpoint) setErrors((p) => ({ ...p, endpoint: undefined }));
+              }}
+              placeholder="example.com"
+            />
+          </FormField>
           <FormField label="Protocol">
             <Select
               selectedOption={{ label: form.protocol, value: form.protocol }}

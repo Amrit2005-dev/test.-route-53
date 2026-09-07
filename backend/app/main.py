@@ -157,6 +157,29 @@ app = FastAPI(
     openapi_url=None if IS_PRODUCTION and os.getenv("ENABLE_DOCS", "").lower() not in ("1", "true", "yes") else "/openapi.json",
 )
 
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    errors = exc.errors()
+    messages = []
+    for err in errors:
+        loc = [str(x) for x in err.get("loc", []) if x not in ("body", "query", "path")]
+        field_name = " -> ".join(loc) if loc else "Field"
+        msg = err.get("msg", "Invalid value")
+        if msg.startswith("Value error, "):
+            msg = msg[len("Value error, "):]
+        if "at least 1 character" in msg.lower() or "missing" in msg.lower():
+            messages.append(f"{field_name} is required and cannot be empty" if field_name != "Field" else "Field is required")
+        else:
+            messages.append(f"{field_name}: {msg}" if field_name != "Field" else msg)
+    error_msg = "; ".join(messages) if messages else "Validation error"
+    return JSONResponse(status_code=422, content={"detail": error_msg, "errors": jsonable_encoder(errors)})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
