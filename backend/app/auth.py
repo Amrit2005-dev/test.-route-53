@@ -69,11 +69,20 @@ def delete_session(db: Session, session_id: str) -> None:
 
 
 def get_session_id(request: Request) -> Optional[str]:
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+        if token:
+            return token
+    x_session = request.headers.get("X-Session-ID")
+    if x_session:
+        return x_session.strip()
     return request.cookies.get(SESSION_COOKIE)
 
 
 def set_session_cookie(response, session_id: str) -> None:
-    secure = os.getenv("COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
+    env = os.getenv("ENV", "development").lower()
+    secure = env in ("production", "prod") or os.getenv("COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
     response.set_cookie(
         key=SESSION_COOKIE,
         value=session_id,
@@ -86,7 +95,8 @@ def set_session_cookie(response, session_id: str) -> None:
 
 
 def clear_session_cookie(response) -> None:
-    secure = os.getenv("COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
+    env = os.getenv("ENV", "development").lower()
+    secure = env in ("production", "prod") or os.getenv("COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
     response.delete_cookie(
         key=SESSION_COOKIE,
         path="/",

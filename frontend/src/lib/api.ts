@@ -3,6 +3,28 @@ import { toApiPathId } from "./paths";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem("route53_session_token");
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) {
+      localStorage.setItem("route53_session_token", token);
+    } else {
+      localStorage.removeItem("route53_session_token");
+    }
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
 class ApiError extends Error {
   status: number;
 
@@ -14,6 +36,11 @@ class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const isForm = options.body instanceof FormData;
+  const token = getStoredToken();
+  const authHeaders: Record<string, string> = token
+    ? { Authorization: `Bearer ${token}`, "X-Session-ID": token }
+    : {};
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
@@ -21,6 +48,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       credentials: "include",
       headers: {
         ...(isForm ? {} : { "Content-Type": "application/json" }),
+        ...authHeaders,
         ...(options.headers || {}),
       },
     });
@@ -56,13 +84,24 @@ function zonePath(id: string) {
 }
 
 export const api = {
-  login: (username: string, password: string) =>
-    request<{ user: User; session_id: string }>("/api/auth/login", {
+  login: async (username: string, password: string) => {
+    const data = await request<{ user: User; session_id: string }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ username, password }),
-    }),
+    });
+    if (data?.session_id) {
+      setStoredToken(data.session_id);
+    }
+    return data;
+  },
 
-  logout: () => request<{ message: string }>("/api/auth/logout", { method: "POST" }),
+  logout: async () => {
+    try {
+      return await request<{ message: string }>("/api/auth/logout", { method: "POST" });
+    } finally {
+      setStoredToken(null);
+    }
+  },
 
   me: () => request<User>("/api/auth/me"),
 
@@ -128,8 +167,13 @@ export const api = {
     }),
 
   exportHostedZone: async (id: string, format: "json" | "bind") => {
+    const token = getStoredToken();
+    const authHeaders: Record<string, string> = token
+      ? { Authorization: `Bearer ${token}`, "X-Session-ID": token }
+      : {};
     const response = await fetch(`${API_BASE}/api/hosted-zones/${zonePath(id)}/export?format=${format}`, {
       credentials: "include",
+      headers: authHeaders,
     });
     if (!response.ok) throw new ApiError("Export failed", response.status);
     return response.text();
